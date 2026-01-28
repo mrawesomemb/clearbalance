@@ -1,20 +1,18 @@
-from fastapi import APIRouter
-from datetime import date
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 from app.models.schemas import Transaction
+from app.db.database import get_db
+from app.db.models import TransactionDB
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
-fake_transactions = [
-    Transaction(id=1, account_id=1, amount=-42.17, date=date.today(), description="Target"),
-    Transaction(id=2, account_id=2, amount=-25.05, date=date.today(), description="Walmart"),
-]
+
 
 @router.get("/", response_model=list[Transaction])
-def get_transactions(account_id: int | None = None):
-    if account_id is None:
-        return fake_transactions
+def get_transactions(account_id: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(TransactionDB)
+    if account_id:
+        query = query.filter(TransactionDB.account_id == account_id)
     
-    return [
-        t for t in fake_transactions
-          if t.account_id == account_id
-        ]
+    return query.order_by(TransactionDB.id).all()
