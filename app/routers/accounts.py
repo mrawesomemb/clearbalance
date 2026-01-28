@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 
-from app.models.schemas import Account
+from app.models.schemas import Account, AccountCreate
 from app.db.database import get_db
 from app.db.models import AccountDB
 
@@ -18,10 +18,10 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Account not found")
     return account
 
-@router.post("/", response_model=Account)
-def create_account(account: Account, db: Session = Depends(get_db)):
-    db_account = AccountDB(**account.model_dump())
-    db.add(db_account)
+@router.post("/", response_model=Account, status_code=status.HTTP_201_CREATED)
+def create_account(payload: AccountCreate, db: Session = Depends(get_db)):
+    account = AccountDB(name=payload.name, credit_limit=payload.credit_limit)
+    db.add(account)
     db.commit()
-    db.refresh(db_account)
-    return db_account
+    db.refresh(account)
+    return account
