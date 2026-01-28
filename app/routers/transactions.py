@@ -16,3 +16,11 @@ def get_transactions(account_id: int | None = None, db: Session = Depends(get_db
         query = query.filter(TransactionDB.account_id == account_id)
     
     return query.order_by(TransactionDB.id).all()
+
+@router.post("/", response_model=Transaction)
+def create_transaction(transaction: Transaction, db: Session = Depends(get_db)):
+    db_transaction = TransactionDB(**transaction.model_dump())
+    db.add(db_transaction)
+    db.commit()
+    db.refresh(db_transaction)
+    return db_transaction

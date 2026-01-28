@@ -17,3 +17,11 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     return account
+
+@router.post("/", response_model=Account)
+def create_account(account: Account, db: Session = Depends(get_db)):
+    db_account = AccountDB(**account.model_dump())
+    db.add(db_account)
+    db.commit()
+    db.refresh(db_account)
+    return db_account
