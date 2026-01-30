@@ -22,7 +22,7 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
 def create_account(payload: AccountCreate, db: Session = Depends(get_db)):
     if payload.credit_limit <= 0:
         raise HTTPException(status_code=400, detail="Credit limit must be greater than 0")
-    account = AccountDB(name=payload.name, credit_limit=payload.credit_limit)
+    account = AccountDB(name=payload.name, credit_limit=payload.credit_limit, external_id=payload.external_id)
     db.add(account)
     try:
         db.commit()

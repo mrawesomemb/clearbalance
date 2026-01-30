@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field
 from datetime import date
+from typing import Optional
 
 class AccountBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     credit_limit: float = Field(gt=0)
+    external_id: Optional[str] = Field(default=None, max_length=255)
 
 class AccountCreate(AccountBase):
     pass
