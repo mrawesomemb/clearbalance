@@ -23,3 +23,11 @@ class TransactionDB(Base):
     description = Column(String, nullable=False)
 
     __table_args__ = (UniqueConstraint('provider_name', 'provider_tx_id', name='uq_provider_tx'),)
+
+class PlaidItemDB(Base):
+    __tablename__ = "plaid_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    access_token = Column(String, nullable=False, unique=True)
+    item_id = Column(String, nullable=False, unique=True)
+    cursor = Column(String, nullable=True)
