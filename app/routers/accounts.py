@@ -31,3 +31,17 @@ def create_account(payload: AccountCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Account could not be created (integrity error)")
     db.refresh(account)
     return account
+
+@router.post("/{account_id}/map_external")
+def map_external_account(account_id: int, external_id: str, db: Session = Depends(get_db)):
+    account = db.query(AccountDB).filter(AccountDB.id == account_id).first()
+    if not account: 
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    existing = db.query(AccountDB).filter(AccountDB.external_id == external_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="external_id already mapped to another account")
+
+    account.external_id = external_id
+    db.commit()
+    return {"status": "ok", "account_id": account.id, "external_id": external_id}
