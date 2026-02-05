@@ -9,6 +9,7 @@ from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCr
 from plaid.model.products import Products
 from plaid.model.country_code import CountryCode
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from plaid.model.accounts_get_request import AccountsGetRequest
 
 router = APIRouter(prefix="/plaid", tags=["plaid"])
 
@@ -41,3 +42,27 @@ def sandbox_create_item(db: Session = Depends(get_db)):
 
     db.commit()
     return {"item_id": item_id}
+
+@router.get("/accounts/{item_id}")
+def get_accounts(item_id: str, db: Session = Depends(get_db)):
+    item = db.query(PlaidItemDB).filter(PlaidItemDB.item_id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Plaid item not found")
+
+    client = get_plaid_client()
+    req = AccountsGetRequest(access_token=item.access_token)
+    resp = client.accounts_get(req).to_dict()
+    
+    accounts = resp.get("accounts", [])
+
+    return [
+        {
+            "account_id": a["account_id"],
+            "name": a.get("name"),
+            "official_name": a.get("official_name"),
+            "subtype": a.get("subtype"),
+            "type": a.get("type"),
+            "mask": a.get("mask"),
+        }
+        for a in accounts
+    ]
