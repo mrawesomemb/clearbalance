@@ -11,7 +11,7 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 @router.get("/", response_model=list[Transaction])
 def get_transactions(account_id: int | None = None, db: Session = Depends(get_db)):
-    query = db.query(TransactionDB)
+    query = db.query(TransactionDB).filter(TransactionDB.is_removed == False)
     if account_id is not None:
         query = query.filter(TransactionDB.account_id == account_id)
     

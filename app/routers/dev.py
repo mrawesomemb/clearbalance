@@ -6,7 +6,7 @@ from app.db.models import AccountDB, TransactionDB
 from app.models.schemas import Account, AccountCreate, Transaction, TransactionCreate
 from datetime import date
 import os
-DEV_MODE = os.getenv("CLEARBALANCE_DEV_MODE", "false").lower() == "true"
+DEV_MODE = os.getenv("CLEARBALANCE_DEV_MODE", "true").lower() == "true"
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 
@@ -44,3 +44,29 @@ def seed_db(db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "ok", "accounts": [a1.id, a2.id], "transactions_created": len(txs)}
+
+@router.post("/test_apply_modified")
+def test_apply_modified(
+    provider_tx_id: str,  # e.g. from your DB
+    account_external_id: str,  # Plaid account_id, must match AccountDB.external_id
+    db: Session = Depends(get_db),
+):
+    if not DEV_MODE:
+        raise HTTPException(status_code=403, detail="Dev only")
+    # Mock delta: one "modified" transaction with updated fields
+    deltas = {
+        "added": [],
+        "modified": [
+            {
+                "provider_tx_id": provider_tx_id,
+                "account_external_id": account_external_id,
+                "amount": "-99.99",
+                "date": date.today(),
+                "description": "UPDATED VIA APPLY_DELTAS TEST",
+            }
+        ],
+        "removed": [],
+    }
+    from app.services.sync import apply_transaction_deltas
+    result = apply_transaction_deltas(db, "plaid", deltas)
+    return result

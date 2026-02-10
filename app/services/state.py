@@ -10,19 +10,22 @@ def get_account_state(db: Session, account_id: int) -> dict:
     # sum of all transactions for the account
     balance = (
         db.query(func.coalesce(func.sum(TransactionDB.amount), 0.0))
-        .filter(TransactionDB.account_id == account_id)
+        .filter(TransactionDB.account_id == account_id,
+        TransactionDB.is_removed == False)
         .scalar()
     )
 
     tx_count = (
         db.query(func.count(TransactionDB.id))
-        .filter(TransactionDB.account_id == account_id)
+        .filter(TransactionDB.account_id == account_id,
+        TransactionDB.is_removed == False)
         .scalar()
     )
     
     last_date = (
         db.query(func.max(TransactionDB.date))
-        .filter(TransactionDB.account_id == account_id)
+        .filter(TransactionDB.account_id == account_id,
+        TransactionDB.is_removed == False)
         .scalar()
     )
     

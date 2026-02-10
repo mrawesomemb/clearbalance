@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, UniqueConstraint, Boolean
 from app.db.database import Base
 
 class AccountDB(Base):
@@ -13,6 +13,8 @@ class TransactionDB(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    is_removed = Column(Boolean, nullable=False, default=False)
 
     provider_name = Column(String, nullable=False)
     provider_tx_id = Column(String, nullable=False)

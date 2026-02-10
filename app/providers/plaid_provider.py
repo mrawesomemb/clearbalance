@@ -3,7 +3,7 @@ from typing import Any
 from decimal import Decimal
 from app.providers.base import BaseProvider, ProviderTransaction
 from app.integrations.plaid_client import get_plaid_client
-from app.db.models import PlaidItemDB
+from app.db.models import PlaidItemDB, AccountDB
 from sqlalchemy.orm import Session
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 
@@ -18,6 +18,18 @@ def coerce_date(value: Any) -> date:
         return value
     raise TypeError(f"Unexpected date type: {type(value)} value={value!r}")
 
+
+def _normalize_tx(tx: dict) -> dict:
+    """Build a ProviderTransaction from a Plaid transaction dict."""
+    return {
+        "provider_tx_id": tx["transaction_id"],
+        "account_external_id": tx["account_id"],
+        "amount": str(tx["amount"]),
+        "date": coerce_date(tx.get("date")),
+        "description": tx.get("name") or tx.get("merchant_name") or "Transaction",
+    }
+
+
 class PlaidProvider(BaseProvider):
     name = "plaid"
 
@@ -25,9 +37,19 @@ class PlaidProvider(BaseProvider):
         self.db = db
         self.client = get_plaid_client()
 
-    def fetch_transactions(self) -> list[ProviderTransaction]:
+    def fetch_transactions(self) -> dict:
         items = self.db.query(PlaidItemDB).all()
-        out: list[ProviderTransaction] = []
+        added_out: list[ProviderTransaction] = []
+        modified_out: list[ProviderTransaction] = []
+        removed_ids: list[str] = []
+        cursor_updates: dict[str, str | None] = {}
+
+        mapped_external_ids = {
+            ext_id
+            for (ext_id,) in self.db.query(AccountDB.external_id)
+            .filter(AccountDB.external_id.isnot(None))
+            .all()
+        }
 
         for item in items:
             cursor = item.cursor
@@ -35,8 +57,8 @@ class PlaidProvider(BaseProvider):
 
             while has_more:
                 req_kwargs = {
-                    "access_token":item.access_token,
-                    "count":100
+                    "access_token": item.access_token,
+                    "count": 100,
                 }
                 if cursor is not None:
                     req_kwargs["cursor"] = cursor
@@ -44,25 +66,27 @@ class PlaidProvider(BaseProvider):
                 req = TransactionsSyncRequest(**req_kwargs)
                 resp = self.client.transactions_sync(req).to_dict()
 
-                added = resp.get("added", [])
-                #resp also includes "modified" and "removed"
+                for tx in resp.get("added", []):
+                    if tx["account_id"] not in mapped_external_ids:
+                        continue
+                    added_out.append(_normalize_tx(tx))
 
-                for tx in added:
-                    out.append(
-                        {
-                            "provider_tx_id": tx["transaction_id"],
-                            "account_external_id": tx["account_id"],
-                            "amount": str(tx["amount"]),
-                            "date": coerce_date(tx.get("date")),
-                            "description": tx.get("name") or tx.get("merchant_name") or "Transaction"
-                        }
-                    )
+                for tx in resp.get("modified", []):
+                    if tx["account_id"] not in mapped_external_ids:
+                        continue
+                    modified_out.append(_normalize_tx(tx))
+
+                for r in resp.get("removed", []):
+                    removed_ids.append(r["transaction_id"])
 
                 cursor = resp.get("next_cursor")
                 has_more = resp.get("has_more", False)
 
-            #save updated cursor
-            item.cursor = cursor
+            cursor_updates[item.item_id] = cursor
 
-        self.db.commit()
-        return out
+        return {
+            "added": added_out,
+            "modified": modified_out,
+            "removed": removed_ids,
+            "cursor_updates": cursor_updates,
+        }
